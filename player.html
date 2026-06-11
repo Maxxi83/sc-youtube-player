@@ -20,17 +20,30 @@ html, body {
     width: 100%;
     height: 100%;
 }
+
+#volumeDebug {
+    position: fixed;
+    right: 8px;
+    bottom: 8px;
+    z-index: 9999;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    font: 12px Arial, sans-serif;
+    padding: 4px 6px;
+}
 </style>
 </head>
 <body>
 
 <div id="player"></div>
+<div id="volumeDebug">VOL: --</div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 const params = new URLSearchParams(window.location.search);
 const url = params.get('url') || '';
+const initialVolume = Math.max(0, Math.min(100, Number(params.get('volume')) || 60));
 
 function extractVideoId(url) {
     const regex =
@@ -47,8 +60,41 @@ const videoId = extractVideoId(url);
 
 console.log('[SC_PROXY] url:', url);
 console.log('[SC_PROXY] videoId:', videoId);
+console.log('[SC_PROXY] initial volume:', initialVolume);
 
 window.player = null;
+
+function updateVolumeDebug(volume) {
+    const debug = document.getElementById('volumeDebug');
+    if (debug) {
+        debug.textContent = 'VOL: ' + volume;
+    }
+}
+
+function applyVolume(volume) {
+    volume = Math.max(0, Math.min(100, Number(volume) || 0));
+
+    updateVolumeDebug(volume);
+
+    if (!window.player || typeof window.player.setVolume !== 'function') {
+        console.log('[SC_PROXY] applied volume: player not ready');
+        return;
+    }
+
+    if (volume <= 0) {
+        window.player.setVolume(0);
+        if (typeof window.player.mute === 'function') {
+            window.player.mute();
+        }
+    } else {
+        if (typeof window.player.unMute === 'function') {
+            window.player.unMute();
+        }
+        window.player.setVolume(volume);
+    }
+
+    console.log('[SC_PROXY] applied volume:', volume);
+}
 
 function onYouTubeIframeAPIReady() {
     console.log('[SC_PROXY] api loaded');
@@ -65,25 +111,31 @@ function onYouTubeIframeAPIReady() {
         videoId: videoId,
         playerVars: {
             autoplay: 1,
+            mute: 1,
             controls: 1,
             rel: 0,
             playsinline: 1,
             enablejsapi: 1,
-            modestbranding: 1
+            modestbranding: 1,
+            origin: window.location.origin
         },
         events: {
-            onReady: () => {
+            onReady: function (event) {
+                window.player = event.target;
                 console.log('[SC_PROXY] player ready');
+                applyVolume(initialVolume);
+                event.target.playVideo();
             },
-            onError: (e) => {
-                console.error('[SC_PROXY] youtube error:', e.data);
+            onError: function (event) {
+                console.log('[SC_PROXY] youtube error code:', event && event.data);
             }
         }
     });
 }
 
-// Recebe volume do FiveM
-window.addEventListener('message', (event) => {
+window.addEventListener('message', function (event) {
+    console.log('[SC_PROXY] received message:', event.data);
+
     let data = event.data;
 
     if (typeof data === 'string') {
@@ -96,24 +148,11 @@ window.addEventListener('message', (event) => {
 
     if (!data || data.action !== 'setVolume') return;
 
-    const volume = Math.max(
-        0,
-        Math.min(100, Number(data.volume) || 0)
-    );
+    const volume = Math.max(0, Math.min(100, Number(data.volume) || 0));
 
-    const player = window.player;
+    console.log('[SC_PROXY] received volume:', volume);
 
-    if (!player || typeof player.setVolume !== 'function') return;
-
-    player.setVolume(volume);
-
-    if (volume <= 0 && typeof player.mute === 'function') {
-        player.mute();
-    } else if (volume > 0 && typeof player.unMute === 'function') {
-        player.unMute();
-    }
-
-    console.log('[SC_PROXY] volume:', volume);
+    applyVolume(volume);
 });
 </script>
 
