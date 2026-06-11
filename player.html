@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+<title>SC YouTube Proxy Player</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: black;
+}
+
+#player {
+    width: 100%;
+    height: 100%;
+}
+</style>
+</head>
+<body>
+
+<div id="player"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const url = params.get('url') || '';
+
+function extractVideoId(url) {
+    const regex =
+        /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regex);
+
+    return (match && match[2].length === 11)
+        ? match[2]
+        : null;
+}
+
+const videoId = extractVideoId(url);
+
+console.log('[SC_PROXY] url:', url);
+console.log('[SC_PROXY] videoId:', videoId);
+
+let player = null;
+
+function onYouTubeIframeAPIReady() {
+    console.log('[SC_PROXY] api loaded');
+
+    if (!videoId) {
+        console.error('[SC_PROXY] invalid video id');
+        return;
+    }
+
+    player = new YT.Player('player', {
+        width: '100%',
+        height: '100%',
+        host: 'https://www.youtube-nocookie.com',
+        videoId: videoId,
+        playerVars: {
+            autoplay: 1,
+            controls: 1,
+            rel: 0,
+            playsinline: 1,
+            enablejsapi: 1,
+            modestbranding: 1
+        },
+        events: {
+            onReady: () => {
+                console.log('[SC_PROXY] player ready');
+            },
+            onError: (e) => {
+                console.error('[SC_PROXY] youtube error:', e.data);
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>
