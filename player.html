@@ -12,7 +12,128 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: black;
+    background: black;<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SC YouTube Player</title>
+  <style>
+    html, body, #player {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #volumeDebug {
+      position: fixed;
+      right: 8px;
+      bottom: 8px;
+      z-index: 9999;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.55);
+      font: 12px Arial, sans-serif;
+      padding: 4px 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <div id="volumeDebug">VOL: --</div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sourceUrl = params.get('url') || '';
+
+    function getVideoId(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '').split('/')[0];
+        if (parsed.searchParams.has('v')) return parsed.searchParams.get('v');
+        if (parsed.pathname.includes('/shorts/')) return parsed.pathname.split('/shorts/')[1].split('/')[0];
+        if (parsed.pathname.includes('/embed/')) return parsed.pathname.split('/embed/')[1].split('/')[0];
+      } catch (error) {}
+      return '';
+    }
+
+    function setDebugVolume(volume) {
+      const debug = document.getElementById('volumeDebug');
+      if (debug) debug.textContent = 'VOL: ' + volume;
+    }
+
+    function applyVolume(volume) {
+      volume = Math.max(0, Math.min(100, Number(volume) || 0));
+      console.log('[SC_PROXY] received volume:', volume);
+
+      setDebugVolume(volume);
+
+      if (!window.player || typeof window.player.setVolume !== 'function') {
+        console.log('[SC_PROXY] applied volume: player not ready');
+        return;
+      }
+
+      if (volume <= 0) {
+        window.player.setVolume(0);
+        if (typeof window.player.mute === 'function') window.player.mute();
+      } else {
+        if (typeof window.player.unMute === 'function') window.player.unMute();
+        window.player.setVolume(volume);
+      }
+
+      console.log('[SC_PROXY] applied volume:', volume);
+    }
+
+    window.addEventListener('message', function (event) {
+      console.log('[SC_PROXY] received message:', event.data);
+
+      let data = event.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (error) {
+          return;
+        }
+      }
+
+      if (!data || data.action !== 'setVolume') return;
+      applyVolume(data.volume);
+    });
+
+    window.onYouTubeIframeAPIReady = function () {
+      const videoId = getVideoId(sourceUrl);
+
+      window.player = new YT.Player('player', {
+        width: '100%',
+        height: '100%',
+        videoId: videoId,
+        host: 'https://www.youtube-nocookie.com',
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          controls: 1,
+          rel: 0,
+          playsinline: 1,
+          enablejsapi: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: function (event) {
+            window.player = event.target;
+            console.log('[SC_PROXY] player ready');
+          },
+          onError: function (event) {
+            console.log('[SC_PROXY] youtube error code:', event && event.data);
+          }
+        }
+      });
+    };
+  </script>
+</body>
+</html>
 }
 
 #player {
