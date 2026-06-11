@@ -100,11 +100,17 @@ function applyVolume(volume) {
             window.player.mute();
         }
     } else {
-        window.player.setVolume(volume);
-
         if (typeof window.player.unMute === 'function') {
             window.player.unMute();
         }
+
+        // Força 100 primeiro no CEF/FiveM para evitar player nascer baixo.
+        window.player.setVolume(100);
+
+        setTimeout(function () {
+            window.player.setVolume(volume);
+            console.log('[SC_PROXY] delayed applied volume:', volume);
+        }, 150);
     }
 
     console.log('[SC_PROXY] applied volume:', volume);
@@ -141,12 +147,21 @@ function onYouTubeIframeAPIReady() {
 
                 console.log('[SC_PROXY] player ready');
 
-                event.target.mute();
-                event.target.setVolume(0);
+                // Destrava volume no CEF/DUI.
+                event.target.setVolume(100);
+                event.target.unMute();
 
-                applyVolume(window.currentVolume);
-
-                event.target.playVideo();
+                setTimeout(function () {
+                    applyVolume(window.currentVolume);
+                    event.target.playVideo();
+                }, 1000);
+            },
+            onStateChange: function () {
+                // Reforço leve: se estiver tocando e volume > 0, garante unmute.
+                if (window.currentVolume > 0 && window.player && typeof window.player.unMute === 'function') {
+                    window.player.unMute();
+                    window.player.setVolume(window.currentVolume);
+                }
             },
             onError: function (event) {
                 console.log('[SC_PROXY] youtube error code:', event && event.data);
