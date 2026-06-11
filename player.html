@@ -168,14 +168,31 @@ window.onYouTubeIframeAPIReady = function () {
 
         setDebugVolume(initialVolume);
 
-        // Começa mutado para autoplay não quebrar.
+        // Começa mutado
         event.target.mute();
         event.target.playVideo();
 
-        // Depois aplica volume real vindo do sistema.
+        // Espera player estabilizar
         setTimeout(() => {
-          applyVolume(initialVolume);
-        }, 500);
+          try {
+            if (initialVolume > 0) {
+              event.target.unMute();
+            }
+
+            event.target.setVolume(initialVolume);
+
+            console.log(
+              '[SC_PROXY] startup volume:',
+              initialVolume
+            );
+
+          } catch (error) {
+            console.error(
+              '[SC_PROXY] startup volume error:',
+              error
+            );
+          }
+        }, 2000);
       },
 
       onError: function (event) {
