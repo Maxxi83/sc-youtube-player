@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -34,6 +35,7 @@ const url = params.get('url') || '';
 function extractVideoId(url) {
     const regex =
         /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+
     const match = url.match(regex);
 
     return (match && match[2].length === 11)
@@ -46,7 +48,7 @@ const videoId = extractVideoId(url);
 console.log('[SC_PROXY] url:', url);
 console.log('[SC_PROXY] videoId:', videoId);
 
-let player = null;
+window.player = null;
 
 function onYouTubeIframeAPIReady() {
     console.log('[SC_PROXY] api loaded');
@@ -56,7 +58,7 @@ function onYouTubeIframeAPIReady() {
         return;
     }
 
-    player = new YT.Player('player', {
+    window.player = new YT.Player('player', {
         width: '100%',
         height: '100%',
         host: 'https://www.youtube-nocookie.com',
@@ -79,7 +81,42 @@ function onYouTubeIframeAPIReady() {
         }
     });
 }
+
+// Recebe volume do FiveM
+window.addEventListener('message', (event) => {
+    let data = event.data;
+
+    if (typeof data === 'string') {
+        try {
+            data = JSON.parse(data);
+        } catch (error) {
+            return;
+        }
+    }
+
+    if (!data || data.action !== 'setVolume') return;
+
+    const volume = Math.max(
+        0,
+        Math.min(100, Number(data.volume) || 0)
+    );
+
+    const player = window.player;
+
+    if (!player || typeof player.setVolume !== 'function') return;
+
+    player.setVolume(volume);
+
+    if (volume <= 0 && typeof player.mute === 'function') {
+        player.mute();
+    } else if (volume > 0 && typeof player.unMute === 'function') {
+        player.unMute();
+    }
+
+    console.log('[SC_PROXY] volume:', volume);
+});
 </script>
 
 </body>
 </html>
+```
